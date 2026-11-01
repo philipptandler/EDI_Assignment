@@ -203,14 +203,14 @@ glmm_model <- function(model, n){
   }
   if(model %in% c("B", "C", "BC")){
     df_wolfcaribou <- simulate_data("BC", n)
-    model_BC <- glmer(
+    model_B <- glmer(
       cbind(wolf, no_wolf) ~
         corridor * phase * caribou + habitat +
         (1|sectionID) + (1|cameraID),
       family = binomial,
       data = df_wolfcaribou
     )
-    return(model_BC)
+    return(model_B)
   } 
 }
 
@@ -243,7 +243,9 @@ estimate_power <- function(target, n, alpha, n_sim, print_output = FALSE){
 
 set.seed(1234)
 
-estimate_power(target = "A", n = 3, alpha = 0.05, n_sim = 5, print_output = TRUE)
+#########################
+#### Power Analysis #####
+#########################
 
 # creating a table with observed powers for hypothesis A, B, and C
 range_of_replicates <- 1:10
@@ -270,15 +272,98 @@ matplot(
   power_table$n,
   power_table[, c("A", "B", "C")],
   type = "p",
-  pch = 1,
-  col = "burlywood", "coral", "cadetblue",
-  xlab = "Number of replicates",
+  pch = 16,
+  col = c("burlywood", "coral", "cadetblue"),
+  xlab = "Number of replicates (n)",
   ylab = "Power",
-  ylim = c(0, 1)
+  ylim = c(0.5, 1)
 )
+abline(h=0.95)
+abline(h=0.8, lty = 2)
+
 legend(
   "bottomright",
-  legend = c("A", "B", "C"),
-  col = "burlywood", "coral", "cadetblue",
-  pch = 1
+  legend = c("Hypothesis A", "Hypothesis B", "Hypothesis C"),
+  col = c("burlywood", "coral", "cadetblue"),
+  pch = 16
 )
+
+##################################
+#### Estimating Actual Effect ####
+##################################
+
+n_replicates <- 3
+model_names <- c("A", "B")
+n_sim <- 100
+
+# to visualize effect, I run the models for n=3 for n_sim repetitions
+modelA_ref <- glmm_model("A", n_replicates)
+modelB_ref <- glmm_model("B", n_replicates)
+coef_A_ref <- summary(modelA_ref)$coefficients[, 1]
+coef_B_ref <- summary(modelB_ref)$coefficients[, 1]
+
+coef_A <- matrix(
+  0,
+  nrow = n_sim,
+  ncol = length(coef_A_ref),
+  dimnames = list(NULL, names(coef_A_ref))
+)
+
+coef_B <- matrix(
+  0,
+  nrow = n_sim,
+  ncol = length(coef_B_ref),
+  dimnames = list(NULL, names(coef_B_ref))
+)
+
+# calculate effects
+for (i in 1:n_sim){
+  modelA_i <- glmm_model("A", n_replicates)
+  modelB_i <- glmm_model("B", n_replicates)
+  
+  coef_A[i, ] <- summary(modelA_i)$coefficients[, 1]
+  coef_B[i, ] <- summary(modelB_i)$coefficients[, 1]
+  
+}
+
+# get all coefficients in one dataaframe
+coef_data <- cbind(coef_A, coef_B)
+positions <- c(1:5, 7:15)
+box_cols <- rep("grey", ncol(coef_data))
+box_cols[c(5, 11, 14)] <- c("burlywood", "coral", "cadetblue")
+
+par(mar = c(12, 4, 2, 2))
+boxplot(
+  coef_data,
+  at = positions,
+  xaxt = "n",
+  col = box_cols,
+  ylab = "Coefficient estimate"
+)
+
+axis(1, at = positions, labels = FALSE)
+
+# Add diagonal labels
+usr <- par("usr")
+par(xpd = NA)
+
+text(
+  x = positions,
+  y = usr[3] - 0.04 * diff(usr[3:4]),
+  labels = colnames(coef_data),
+  srt = 45,
+  adj = 1,
+  cex = 0.8
+)
+
+par(xpd = FALSE)
+
+abline(h=0)
+
+legend(
+  "bottomright",
+  legend = c("Hypothesis A", "Hypothesis B", "Hypothesis C"),
+  col = c("burlywood", "coral", "cadetblue"),
+  pch = 15
+)
+
