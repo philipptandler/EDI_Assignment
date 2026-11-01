@@ -20,7 +20,7 @@ beta_corr_phas <- 0.9 # assume higher probability of wolf detection on road
 beta_corr_cari <- 0 # assume no wolf in impact corridor pre construction respond same to caribou as in control corridor
 beta_cari_phas <- 0 # assume no change in wolf detection given caribou in ref level
 beta_cari_corr_phas <- 1.3 # assume wolfs can respond better to caribou in impact corridor post constuction
-beta_sigma <- 0.67
+beta_sigma <- 2.24
 
 
 #### expected effects on log-odds of caribou detection ####
@@ -29,4 +29,4 @@ gamma_corr <- 0 # assume caribou detection independent of corridor
 gamma_phas <- 0 # assume caribou detection independent of pre or post construction in control
 gamma_habi <- 0 # assume no habitat preference of caribou (for simplicity)
 gamma_corr_phas <- -0.4 #decreased likelihood of detecting caribou post-construction
-gamma_sigma <- 0.71
+gamma_sigma <- 1.41

@@ -1,5 +1,6 @@
 library(here)
 library(dplyr)
+library(lme4)
 # Set working directory only if not already set
 setwd(here::here())
 
@@ -9,16 +10,16 @@ source("config.R")
 # PRE: dataframe df with corridor | phase | habitat and levels according to config.R
 # POST: returns dataframe n_df with columns n00 | n01 | n10 | n11,
 # corresponding to detections of wolf and caribou
-simulate_daily_observations <- function(df_obs){
+simulate_daily_observations <- function(df_obs, n_treats){
   n00 <- rep(0,n_treats)
   n01 <- rep(0,n_treats)
   n10 <- rep(0,n_treats)
   n11 <- rep(0,n_treats)
   # fill dataframe for the predictors
   for (row in 1:n_treats){
-    effect_corridor <- as.numeric(observation[row,]$corridor)-1
-    effect_phase <- as.numeric(observation[row,]$phase)-1
-    effect_habitat <- as.numeric(observation[row,]$habitat)-1
+    effect_corridor <- as.numeric(df_obs[row,]$corridor)-1
+    effect_phase <- as.numeric(df_obs[row,]$phase)-1
+    effect_habitat <- as.numeric(df_obs[row,]$habitat)-1
     # first for caribou (not dependent on wolf)
     linear_predictor_caribou <- 
       gamma_0 +
@@ -93,7 +94,7 @@ simulate_observations <- function(n_cameras){
       ref = phase[2]
     )
   )
-  df_n <- simulate_daily_observations(full_observations)
+  df_n <- simulate_daily_observations(full_observations, n_treats)
   full_observations <- cbind(
     full_observations, df_n
   )
@@ -159,17 +160,37 @@ glmm_model <- function(model, n){
     model_BC <- glmer(
       cbind(wolf, no_wolf) ~
         corridor * phase * caribou + habitat +
-        habitatType +
         (1|sectionID) + (1|cameraID),
       family = binomial,
       data = df_wolfcaribou
     )
     return(model_BC)
   } 
-
 }
+
+# PRE: target effect 'target' %in% c("A", "B", "C"), 
+# n := sample size, integer, n >= 1
+# significance level ALPHA in [0,1], 
+# n_sim := numer of simulations, integer, n_sim >= 1
+# POST: power = (1 - BETA), as probability of rejecting the Nullhypothesis of 
+# target effect at significane level ALPHA given the alternative hypothesis
+# is true, which is the assumption in the simulated data
+estimate_power <- function(target, n, ALPHA, n_sim){
+  alternative_hypothesis_detected <- rep(0, n_sim)
+  for(i in 1:n_sim){
+    model <- glmm_model(target, n)
+    if(target == "A"){pval = summary(model)$coefficients[5,4]}
+    if(target == "B"){pval = summary(model)$coefficients[6,4]}
+    if(target == "C"){pval = summary(model)$coefficients[9,4]}
+    alternative_hypothesis_detected[i] <- as.numeric(pval <= ALPHA)
+  }
+  mean(alternative_hypothesis_detected)
+}
+
+
 
 set.seed(1234)
 
+estimate_power(target = "C", n = 2, ALPHA = 0.05, n_sim = 10)
 
 
