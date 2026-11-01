@@ -100,12 +100,73 @@ simulate_observations <- function(n_cameras){
   full_observations
 }
 
-# PRE: n_cameras (per treatment) >= 1, hypothesis = c('A', 'B', 'C')
-# POST: returns data frame with 
-simulate_data <- function(n_cameras, hypothesis){
+# PRE: n_cameras (per treatment) >= 1, hypothesis = c('A', 'B', 'C', 'BC')
+# POST: returns data frame suitable to test hypothesis A, B, or C 
+simulate_data <- function(hypothesis, n_cameras){
   df_full <- simulate_observations(n_cameras)
   # aggregate depending on hypothesis:
-  
+  if(hypothesis == "A"){
+    df_wolf <- df_full %>%
+      mutate(
+        wolf = n01 + n11,
+        no_wolf = n00 + n10
+      ) %>%
+      select(cameraID, corridor, sectionID, habitat, phase, wolf, no_wolf)
+    return(df_wolf)
+  }
+  if(hypothesis %in% c("B", "C", "BC")){
+    df_absent <- df_full %>%
+      transmute(
+        cameraID, corridor, sectionID, habitat, phase,
+        caribou = "absent",
+        wolf = n01,
+        no_wolf = n00
+      )
+    
+    df_present <- df_full %>%
+      transmute(
+        cameraID, corridor, sectionID, habitat, phase,
+        caribou = "present",
+        wolf = n11,
+        no_wolf = n10
+      )
+    
+    df_wolfcaribou <- bind_rows(df_absent, df_present) %>%
+      mutate(
+        caribou = factor(caribou, levels = c("absent", "present"))
+      )
+    return(df_wolfcaribou)
+  } 
+}
+
+# PRE: model "A" or "B" or "C" or "BC", n := n_cameras
+# POST: returns glmer model for appropriate hypothesis with data simulated with 
+# n_cameras at each treatment
+glmm_model <- function(model, n){
+  if(model == "A"){
+    df_wolf <- simulate_data("A", n)
+    model_A <- glmer(
+      cbind(wolf, no_wolf) ~
+        corridor * phase + habitat +
+        (1|sectionID) + (1|cameraID),
+      family = binomial,
+      data = df_wolf
+    )
+    return(model_A)
+  }
+  if(model %in% c("B", "C", "BC")){
+    df_wolfcaribou <- simulate_data("BC", n)
+    model_BC <- glmer(
+      cbind(wolf, no_wolf) ~
+        corridor * phase * caribou + habitat +
+        habitatType +
+        (1|sectionID) + (1|cameraID),
+      family = binomial,
+      data = df_wolfcaribou
+    )
+    return(model_BC)
+  } 
+
 }
 
 set.seed(1234)
